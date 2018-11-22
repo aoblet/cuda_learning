@@ -94,21 +94,22 @@ int main( int argc, char * argv[] ) {
 	  // the chunk is the width x chunk vertical
 	  // so we need to offset the matrix adress by currentStream
 	  // Then we can copy by chunk
-	  int offset = width * chunkVectorHeight * i;
-      cudaMemcpyAsync(redMatrix_d+offset, redMatrix_h+offset, chunkVectorHeightBytes, cudaMemcpyHostToDevice, streams[i]);
-      cudaMemcpyAsync(greenMatrix_d+offset, greenMatrix_h+offset, chunkVectorHeightBytes, cudaMemcpyHostToDevice, streams[i]);
-      cudaMemcpyAsync(blueMatrix_d+offset, blueMatrix_h+offset, chunkVectorHeightBytes, cudaMemcpyHostToDevice, streams[i]);
+	int offset = width * chunkVectorHeight * i;
+	cudaMemcpyAsync(redMatrix_d+offset, redMatrix_h+offset, chunkVectorHeightBytes, cudaMemcpyHostToDevice, streams[i]);
+	cudaMemcpyAsync(greenMatrix_d+offset, greenMatrix_h+offset, chunkVectorHeightBytes, cudaMemcpyHostToDevice, streams[i]);
+	cudaMemcpyAsync(blueMatrix_d+offset, blueMatrix_h+offset, chunkVectorHeightBytes, cudaMemcpyHostToDevice, streams[i]);
   }
 
   // block/grid dimension setup
   dim3 block(32, 32);
   // grid size is automatically adjusted according the block size and the image size
-  dim3 grid((width-1)/block.x + 1, (height-1)/block.y + 1);
+  dim3 grid((width-1)/block.x + 1, (height-1)/(block.y*nbStreams) + 1);
 
   // Launch kernels
   for(int i=0; i<nbStreams; ++i){
 	  cudaEventRecord(start, streams[i]);
-  	  grayscaleKernel<<<grid, block, 0, streams[i] >>>(redMatrix_d, greenMatrix_d, blueMatrix_d, out_d, width, height);
+	  int offset = width * chunkVectorHeight * i;
+  	  grayscaleKernel<<<grid, block, 0, streams[i] >>>(redMatrix_d+offset, greenMatrix_d+offset, blueMatrix_d+offset, out_d+offset, width, height/nbStreams);
   }
 
   // Put back GPU result to CPU by chunk (stream)
